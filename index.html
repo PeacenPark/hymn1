@@ -6,7 +6,19 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>찬송가 뷰어</title>
+    <!-- GitHub Pages 호환: base 태그 (repository 이름이 있다면 수정하세요) -->
+    <!-- 예: <base href="/repository-name/"> -->
     <link rel="stylesheet" href="style.css">
+    <style>
+        /* 로딩 중 스타일 추가 */
+        .hymn-loading {
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+        }
+    </style>
 </head>
 <body>
     <!-- 햄버거 메뉴 버튼 -->
