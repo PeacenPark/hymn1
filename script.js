@@ -260,7 +260,7 @@ function tryLoadWithPatterns(container, folder, number, patterns, callback) {
     patterns.forEach((pattern, idx) => {
         const testImg = new Image();
         
-        // 2초 타임아웃
+        // 3초 타임아웃 (온라인 환경 고려)
         const timeoutId = setTimeout(() => {
             if (!hasSucceeded) {
                 completedCount++;
@@ -276,7 +276,7 @@ function tryLoadWithPatterns(container, folder, number, patterns, callback) {
                     if (callback) callback([number], false); // 실패해도 자기 번호는 반환, 추가 페이지 없음
                 }
             }
-        }, 2000);
+        }, 3000); // 2초 → 3초로 증가
         
         testImg.src = `images/${folder}/${pattern.file}`;
         
@@ -309,7 +309,8 @@ function tryLoadWithPatterns(container, folder, number, patterns, callback) {
             img.alt = pattern.type === 'combined' ? 
                 `${pattern.range[0]}-${pattern.range[pattern.range.length-1]}번` : 
                 `${number}번`;
-            img.loading = 'lazy';
+            img.loading = 'eager'; // 메인 이미지는 즉시 로드
+            img.decoding = 'async'; // 비동기 디코딩
             container.innerHTML = '';
             container.appendChild(img);
             container.style.minHeight = '';
@@ -371,7 +372,7 @@ function loadAdditionalPages(container, folder, number, pageNum, finalCallback) 
                     if (finalCallback) finalCallback(false); // ⭐ 추가 페이지 없음
                 }
             }
-        }, 1500);
+        }, 2500); // 1.5초 → 2.5초로 증가
         
         testImg.src = `images/${folder}/${filename}`;
         console.log(`🔄 이미지 로드 시도 [${idx + 1}/${filenames.length}]: ${testImg.src}`);
@@ -391,7 +392,8 @@ function loadAdditionalPages(container, folder, number, pageNum, finalCallback) 
             img.className = 'hymn-image';
             img.src = this.src;
             img.alt = `${number}번 (2페이지)`;
-            img.loading = 'lazy';
+            img.loading = 'eager'; // 추가 페이지도 즉시 로드
+            img.decoding = 'async'; // 비동기 디코딩
             container.appendChild(img);
             
             console.log(`✅ 이미지 DOM 추가 완료 - callback(true) 호출`);
