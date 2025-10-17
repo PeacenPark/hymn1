@@ -170,33 +170,55 @@ function loadHymnImage(number, folder, callback) {
     tryLoadWithPatterns(container, folder, number, patterns, 0, callback);
 }
 
-// 파일명 패턴 생성 - ⚡ 최적화: 최소한의 패턴만!
+// 파일명 패턴 생성 - ⚡ 실제 파일 구조에 맞춤!
 function generateFilePatterns(number, categoryName) {
     const patterns = [];
+    const maxNumber = categories[currentCategory].total;
     
-    // ⭐ 1순위: 단일 파일 (가장 흔한 케이스)
+    // ⭐ 특수 케이스: 551-556 (유일한 6개 합본)
+    if (number >= 551 && number <= 556) {
+        patterns.push({ 
+            file: '551-556.jpeg', 
+            type: 'combined', 
+            range: [551, 552, 553, 554, 555, 556]
+        });
+        patterns.push({ 
+            file: '551-556.jpg', 
+            type: 'combined', 
+            range: [551, 552, 553, 554, 555, 556]
+        });
+    }
+    
+    // 1순위: 단일 파일 (1.jpeg)
     patterns.push({ file: `${number}.jpeg`, type: 'single', range: [number] });
     patterns.push({ file: `${number}.jpg`, type: 'single', range: [number] });
     
-    // 2순위: 2-3개 합본 (일반적)
-    const start2 = Math.max(1, number - 1);
-    const end2 = Math.min(categories[currentCategory].total, number + 1);
+    // 2순위: 2개 합본 - 앞 번호와 합본 (2-3.jpeg에서 3번 찾기)
+    if (number > 1) {
+        patterns.push({ 
+            file: `${number - 1}-${number}.jpeg`, 
+            type: 'combined', 
+            range: [number - 1, number]
+        });
+        patterns.push({ 
+            file: `${number - 1}-${number}.jpg`, 
+            type: 'combined', 
+            range: [number - 1, number]
+        });
+    }
     
-    for (let s = start2; s <= number; s++) {
-        for (let e = number; e <= end2; e++) {
-            if (s < e && (e - s) <= 2) {
-                patterns.push({ 
-                    file: `${s}-${e}.jpeg`, 
-                    type: 'combined', 
-                    range: Array.from({length: e - s + 1}, (_, i) => s + i)
-                });
-                patterns.push({ 
-                    file: `${s}-${e}.jpg`, 
-                    type: 'combined', 
-                    range: Array.from({length: e - s + 1}, (_, i) => s + i)
-                });
-            }
-        }
+    // 3순위: 2개 합본 - 다음 번호와 합본 (2-3.jpeg에서 2번 찾기)
+    if (number < maxNumber) {
+        patterns.push({ 
+            file: `${number}-${number + 1}.jpeg`, 
+            type: 'combined', 
+            range: [number, number + 1]
+        });
+        patterns.push({ 
+            file: `${number}-${number + 1}.jpg`, 
+            type: 'combined', 
+            range: [number, number + 1]
+        });
     }
     
     console.log(`📋 ${number}번 패턴: ${patterns.length}개`);
@@ -274,12 +296,10 @@ function tryLoadWithPatterns(container, folder, number, patterns, index, callbac
     };
 }
 
-// 추가 페이지 로드 - ⚡ 타임아웃 추가
+// 추가 페이지 로드 - ⚡ 실제 구조: 5.jpg, 5-1.jpg
 function loadAdditionalPages(container, folder, number, pageNum, finalCallback) {
-    const categoryName = categories[currentCategory].name;
-    
-    // 최대 2개 추가 페이지만 (대부분 찬송가는 2페이지 이내)
-    if (pageNum > 2) {
+    // 최대 1개 추가 페이지만 (5-1.jpg)
+    if (pageNum > 1) {
         if (finalCallback) finalCallback();
         return;
     }
@@ -302,7 +322,7 @@ function tryLoadAdditionalPage(container, folder, number, pageNum, filenames, in
     const filename = filenames[index];
     const testImg = new Image();
     
-    // ⚡ 타임아웃 설정: 500ms 내에 로드 안 되면 포기
+    // ⚡ 타임아웃 설정: 300ms 내에 로드 안 되면 포기
     let timeoutId;
     let hasResponded = false;
     
@@ -313,12 +333,11 @@ function tryLoadAdditionalPage(container, folder, number, pageNum, filenames, in
     
     timeoutId = setTimeout(() => {
         if (!hasResponded) {
-            console.log(`⏱️ ${number}-${pageNum} 타임아웃 (${filename})`);
             cleanup();
             // 다음 파일명 시도
             tryLoadAdditionalPage(container, folder, number, pageNum, filenames, index + 1, finalCallback);
         }
-    }, 500);
+    }, 200); // 300ms → 200ms로 단축
     
     testImg.src = `images/${folder}/${filename}`;
     
@@ -331,12 +350,12 @@ function tryLoadAdditionalPage(container, folder, number, pageNum, filenames, in
         const img = document.createElement('img');
         img.className = 'hymn-image';
         img.src = this.src;
-        img.alt = `${number}번 (${pageNum + 1}페이지)`;
+        img.alt = `${number}번 (2페이지)`;
         img.loading = 'lazy';
         container.appendChild(img);
         
-        // 다음 페이지 시도
-        loadAdditionalPages(container, folder, number, pageNum + 1, finalCallback);
+        // 더 이상 추가 페이지 없음 (최대 1개만)
+        if (finalCallback) finalCallback();
     };
     
     testImg.onerror = function() {
