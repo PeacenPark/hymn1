@@ -323,11 +323,12 @@ function tryLoadWithPatterns(container, folder, number, patterns, index, contain
 function loadAdditionalPages(container, folder, number, pageNum) {
     const categoryName = categories[currentCategory].name;
     
+    // .jpeg를 먼저 시도
     const filenames = [
-        `${number}-${pageNum}.jpg`,
         `${number}-${pageNum}.jpeg`,
-        `${categoryName} ${number}-${pageNum}.jpg`,
-        `${categoryName} ${number}-${pageNum}.jpeg`
+        `${number}-${pageNum}.jpg`,
+        `${categoryName} ${number}-${pageNum}.jpeg`,
+        `${categoryName} ${number}-${pageNum}.jpg`
     ];
     
     tryLoadAdditionalPage(container, folder, number, pageNum, filenames, 0);
