@@ -170,74 +170,36 @@ function loadHymnImage(number, folder, callback) {
     tryLoadWithPatterns(container, folder, number, patterns, 0, callback);
 }
 
-// 파일명 패턴 생성 - ⚡ 최적화: 단일 파일을 먼저!
+// 파일명 패턴 생성 - ⚡ 최적화: 최소한의 패턴만!
 function generateFilePatterns(number, categoryName) {
     const patterns = [];
-    const maxNumber = categories[currentCategory].total;
     
-    // ⭐ 1순위: 단일 파일 (가장 흔한 케이스) - .jpeg 먼저
+    // ⭐ 1순위: 단일 파일 (가장 흔한 케이스)
     patterns.push({ file: `${number}.jpeg`, type: 'single', range: [number] });
     patterns.push({ file: `${number}.jpg`, type: 'single', range: [number] });
     
-    // 2순위: 단일 파일 (카테고리명 포함)
-    patterns.push({ file: `${categoryName} ${number}.jpeg`, type: 'single', range: [number] });
-    patterns.push({ file: `${categoryName} ${number}.jpg`, type: 'single', range: [number] });
+    // 2순위: 2-3개 합본 (일반적)
+    const start2 = Math.max(1, number - 1);
+    const end2 = Math.min(categories[currentCategory].total, number + 1);
     
-    // 3순위: 작은 범위 합본 (2-3개)
-    for (let start = Math.max(1, number - 2); start <= number; start++) {
-        for (let end = number; end <= Math.min(maxNumber, start + 2); end++) {
-            if (start < end) {
+    for (let s = start2; s <= number; s++) {
+        for (let e = number; e <= end2; e++) {
+            if (s < e && (e - s) <= 2) {
                 patterns.push({ 
-                    file: `${start}-${end}.jpeg`, 
+                    file: `${s}-${e}.jpeg`, 
                     type: 'combined', 
-                    range: Array.from({length: end - start + 1}, (_, i) => start + i)
+                    range: Array.from({length: e - s + 1}, (_, i) => s + i)
                 });
                 patterns.push({ 
-                    file: `${start}-${end}.jpg`, 
+                    file: `${s}-${e}.jpg`, 
                     type: 'combined', 
-                    range: Array.from({length: end - start + 1}, (_, i) => start + i)
+                    range: Array.from({length: e - s + 1}, (_, i) => s + i)
                 });
             }
         }
     }
     
-    // 4순위: 큰 범위 합본 (4-6개) - 드물지만 체크
-    for (let start = Math.max(1, number - 5); start <= Math.max(1, number - 3); start++) {
-        for (let end = Math.min(number + 3, maxNumber); end <= Math.min(maxNumber, start + 5); end++) {
-            if (start < end && end >= number) {
-                patterns.push({ 
-                    file: `${start}-${end}.jpeg`, 
-                    type: 'combined', 
-                    range: Array.from({length: end - start + 1}, (_, i) => start + i)
-                });
-                patterns.push({ 
-                    file: `${start}-${end}.jpg`, 
-                    type: 'combined', 
-                    range: Array.from({length: end - start + 1}, (_, i) => start + i)
-                });
-            }
-        }
-    }
-    
-    // 5순위: 카테고리명 포함 합본
-    for (let start = Math.max(1, number - 2); start <= number; start++) {
-        for (let end = number; end <= Math.min(maxNumber, start + 2); end++) {
-            if (start < end) {
-                patterns.push({ 
-                    file: `${categoryName} ${start}-${end}.jpeg`, 
-                    type: 'combined', 
-                    range: Array.from({length: end - start + 1}, (_, i) => start + i)
-                });
-                patterns.push({ 
-                    file: `${categoryName} ${start}-${end}.jpg`, 
-                    type: 'combined', 
-                    range: Array.from({length: end - start + 1}, (_, i) => start + i)
-                });
-            }
-        }
-    }
-    
-    console.log(`📋 ${number}번 패턴 개수: ${patterns.length}개`);
+    console.log(`📋 ${number}번 패턴: ${patterns.length}개`);
     return patterns;
 }
 
