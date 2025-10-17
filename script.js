@@ -312,15 +312,19 @@ function tryLoadWithPatterns(container, folder, number, patterns, index, callbac
     };
 }
 
-// 추가 페이지 로드
+// 추가 페이지 로드 - ⚡ 타임아웃 추가
 function loadAdditionalPages(container, folder, number, pageNum, finalCallback) {
     const categoryName = categories[currentCategory].name;
+    
+    // 최대 2개 추가 페이지만 (대부분 찬송가는 2페이지 이내)
+    if (pageNum > 2) {
+        if (finalCallback) finalCallback();
+        return;
+    }
     
     const filenames = [
         `${number}-${pageNum}.jpeg`,
         `${number}-${pageNum}.jpg`,
-        `${categoryName} ${number}-${pageNum}.jpeg`,
-        `${categoryName} ${number}-${pageNum}.jpg`
     ];
     
     tryLoadAdditionalPage(container, folder, number, pageNum, filenames, 0, finalCallback);
@@ -335,9 +339,33 @@ function tryLoadAdditionalPage(container, folder, number, pageNum, filenames, in
     
     const filename = filenames[index];
     const testImg = new Image();
+    
+    // ⚡ 타임아웃 설정: 500ms 내에 로드 안 되면 포기
+    let timeoutId;
+    let hasResponded = false;
+    
+    const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        hasResponded = true;
+    };
+    
+    timeoutId = setTimeout(() => {
+        if (!hasResponded) {
+            console.log(`⏱️ ${number}-${pageNum} 타임아웃 (${filename})`);
+            cleanup();
+            // 다음 파일명 시도
+            tryLoadAdditionalPage(container, folder, number, pageNum, filenames, index + 1, finalCallback);
+        }
+    }, 500);
+    
     testImg.src = `images/${folder}/${filename}`;
     
     testImg.onload = function() {
+        if (hasResponded) return;
+        cleanup();
+        
+        console.log(`✅ ${number}-${pageNum} 추가 페이지 로드 성공`);
+        
         const img = document.createElement('img');
         img.className = 'hymn-image';
         img.src = this.src;
@@ -345,15 +373,15 @@ function tryLoadAdditionalPage(container, folder, number, pageNum, filenames, in
         img.loading = 'lazy';
         container.appendChild(img);
         
-        // 다음 페이지 시도 (최대 5개)
-        if (pageNum < 5) {
-            loadAdditionalPages(container, folder, number, pageNum + 1, finalCallback);
-        } else {
-            if (finalCallback) finalCallback();
-        }
+        // 다음 페이지 시도
+        loadAdditionalPages(container, folder, number, pageNum + 1, finalCallback);
     };
     
     testImg.onerror = function() {
+        if (hasResponded) return;
+        cleanup();
+        
+        // 다음 파일명 시도
         tryLoadAdditionalPage(container, folder, number, pageNum, filenames, index + 1, finalCallback);
     };
 }
