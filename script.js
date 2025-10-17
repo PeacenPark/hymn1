@@ -96,39 +96,51 @@ function loadHymnRange(startNumber) {
     hymnContainer.appendChild(mainContainer);
     
     // 2단계: 검색한 번호 로드 (병렬 검색)
-    loadHymnImage(startNumber, folder, (loadedRange) => {
+    loadHymnImage(startNumber, folder, (loadedRange, hasAdditionalPage) => {
         const mainLoadTime = performance.now();
         console.log(`✅ ${startNumber}번 로드 완료: ${(mainLoadTime - startTime).toFixed(0)}ms`);
         console.log(`📦 로드된 범위: ${loadedRange.join(', ')}`);
+        console.log(`📄 추가 페이지(-1) 존재: ${hasAdditionalPage}`);
         
-        // 3단계: 로드된 파일의 마지막 번호 다음을 로드
-        const lastNumber = Math.max(...loadedRange);
-        const nextNumber = lastNumber + 1;
-        
-        if (nextNumber <= total) {
-            console.log(`➡️ 다음 파일 ${nextNumber}번 로드 시작`);
+        // 3단계: 추가 페이지가 없을 때만 다음 번호 로드
+        if (!hasAdditionalPage) {
+            const lastNumber = Math.max(...loadedRange);
+            const nextNumber = lastNumber + 1;
             
-            const nextContainer = createHymnContainer(nextNumber);
-            hymnContainer.appendChild(nextContainer);
-            
-            loadHymnImage(nextNumber, folder, (nextRange) => {
-                const endTime = performance.now();
-                console.log(`✅ ${nextNumber}번 로드 완료`);
-                console.log(`📦 로드된 범위: ${nextRange.join(', ')}`);
-                console.log(`🎉 전체 로딩 완료: ${(endTime - startTime).toFixed(0)}ms`);
+            if (nextNumber <= total) {
+                console.log(`➡️ 다음 파일 ${nextNumber}번 로드 시작`);
                 
+                const nextContainer = createHymnContainer(nextNumber);
+                hymnContainer.appendChild(nextContainer);
+                
+                loadHymnImage(nextNumber, folder, (nextRange, hasAdditional) => {
+                    const endTime = performance.now();
+                    console.log(`✅ ${nextNumber}번 로드 완료`);
+                    console.log(`📦 로드된 범위: ${nextRange.join(', ')}`);
+                    console.log(`🎉 전체 로딩 완료: ${(endTime - startTime).toFixed(0)}ms`);
+                    
+                    loading.classList.remove('active');
+                    
+                    // 검색한 번호로 스크롤
+                    const firstHymn = document.querySelector(`[data-hymn-number="${startNumber}"]`);
+                    if (firstHymn) {
+                        firstHymn.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                });
+            } else {
+                // 마지막 번호인 경우
                 loading.classList.remove('active');
+                console.log(`🎉 전체 로딩 완료: ${(mainLoadTime - startTime).toFixed(0)}ms`);
                 
-                // 검색한 번호로 스크롤
                 const firstHymn = document.querySelector(`[data-hymn-number="${startNumber}"]`);
                 if (firstHymn) {
                     firstHymn.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
-            });
+            }
         } else {
-            // 마지막 번호인 경우
+            // 추가 페이지가 있으면 다음 번호 로드하지 않음
             loading.classList.remove('active');
-            console.log(`🎉 전체 로딩 완료: ${(mainLoadTime - startTime).toFixed(0)}ms`);
+            console.log(`🎉 전체 로딩 완료 (추가 페이지 있음): ${(mainLoadTime - startTime).toFixed(0)}ms`);
             
             const firstHymn = document.querySelector(`[data-hymn-number="${startNumber}"]`);
             if (firstHymn) {
@@ -167,11 +179,11 @@ function createHymnContainer(number) {
     return container;
 }
 
-// 찬송가 이미지 로드 - callback에 로드된 범위 반환
+// 찬송가 이미지 로드 - callback에 로드된 범위와 추가 페이지 존재 여부 반환
 function loadHymnImage(number, folder, callback) {
     const container = document.querySelector(`[data-hymn-number="${number}"]`);
     if (!container) {
-        if (callback) callback([number]);
+        if (callback) callback([number], false);
         return;
     }
     
@@ -261,7 +273,7 @@ function tryLoadWithPatterns(container, folder, number, patterns, callback) {
                     container.innerHTML = '';
                     container.appendChild(placeholder);
                     container.style.minHeight = '';
-                    if (callback) callback([number]); // 실패해도 자기 번호는 반환
+                    if (callback) callback([number], false); // 실패해도 자기 번호는 반환, 추가 페이지 없음
                 }
             }
         }, 2000);
@@ -302,22 +314,18 @@ function tryLoadWithPatterns(container, folder, number, patterns, callback) {
             container.appendChild(img);
             container.style.minHeight = '';
             
-            // ⭐ 단일 파일: 추가 페이지 시도하지만 callback은 바로 호출!
-            if (pattern.type === 'single') {
-                // 추가 페이지는 백그라운드에서 로드
-                loadAdditionalPages(container, folder, number, 1, null);
-                // callback은 즉시 호출 (다음 파일 로드를 막지 않음)
+            // ⭐ 추가 페이지 체크: 단일은 검색번호, 합본은 마지막 번호
+            const checkNumber = pattern.type === 'single' ? number : Math.max(...finalRange);
+            console.log(`🔎 추가 페이지 체크 시작: ${checkNumber}-1 (파일타입: ${pattern.type})`);
+            
+            loadAdditionalPages(container, folder, checkNumber, 1, (hasAdditional) => {
+                console.log(`✓ ${checkNumber}번 추가 페이지 확인 완료: ${hasAdditional ? '있음 ✅' : '없음 ❌'}`);
                 if (callback) {
-                    console.log(`🔄 ${number}번 callback 호출 (단일 파일)`);
-                    callback(finalRange);
+                    const fileType = pattern.type === 'single' ? '단일' : '합본';
+                    console.log(`📞 callback 호출: 검색${number}번, 파일${fileType}, 체크${checkNumber}번, 추가페이지${hasAdditional}`);
+                    callback(finalRange, hasAdditional);
                 }
-            } else {
-                // 합본: callback 바로 호출
-                if (callback) {
-                    console.log(`🔄 ${number}번 callback 호출 (합본)`);
-                    callback(finalRange);
-                }
-            }
+            });
         };
         
         testImg.onerror = function() {
@@ -329,10 +337,13 @@ function tryLoadWithPatterns(container, folder, number, patterns, callback) {
     });
 }
 
-// 추가 페이지 로드 - ⚡ 병렬! (callback 반드시 호출)
+// 추가 페이지 로드 - ⚡ 병렬! (callback에 존재 여부 전달)
 function loadAdditionalPages(container, folder, number, pageNum, finalCallback) {
+    console.log(`🔍 loadAdditionalPages 호출: ${number}-${pageNum}, callback존재: ${!!finalCallback}`);
+    
     if (pageNum > 1) {
-        if (finalCallback) finalCallback();
+        console.log(`⚠️ pageNum > 1, callback(false) 호출`);
+        if (finalCallback) finalCallback(false);
         return;
     }
     
@@ -341,7 +352,7 @@ function loadAdditionalPages(container, folder, number, pageNum, finalCallback) 
         `${number}-${pageNum}.jpg`,
     ];
     
-    console.log(`🔍 ${number}-${pageNum} 추가 페이지 병렬 검색`);
+    console.log(`🔍 ${number}-${pageNum} 추가 페이지 병렬 검색 - 파일명: ${filenames.join(', ')}`);
     
     let hasSucceeded = false;
     let completedCount = 0;
@@ -353,23 +364,28 @@ function loadAdditionalPages(container, folder, number, pageNum, finalCallback) 
         const timeoutId = setTimeout(() => {
             if (!hasSucceeded) {
                 completedCount++;
+                console.log(`⏱️ ${filename} 타임아웃 (${completedCount}/${filenames.length})`);
                 if (completedCount === filenames.length) {
                     // 모두 실패 - 추가 페이지 없음
-                    console.log(`ℹ️ ${number}번 추가 페이지 없음`);
-                    if (finalCallback) finalCallback(); // ⭐ 반드시 호출!
+                    console.log(`ℹ️ ${number}번 추가 페이지 없음 - callback(false) 호출`);
+                    if (finalCallback) finalCallback(false); // ⭐ 추가 페이지 없음
                 }
             }
         }, 1500);
         
         testImg.src = `images/${folder}/${filename}`;
+        console.log(`🔄 이미지 로드 시도 [${idx + 1}/${filenames.length}]: ${testImg.src}`);
         
         testImg.onload = function() {
-            if (hasSucceeded) return;
+            if (hasSucceeded) {
+                console.log(`⚠️ ${filename} 로드 성공했지만 이미 다른 파일이 성공함`);
+                return;
+            }
             
             hasSucceeded = true;
             clearTimeout(timeoutId);
             
-            console.log(`✅ ${number}-${pageNum} 성공: ${filename}`);
+            console.log(`✅ ${number}-${pageNum} 성공: ${filename} - 이미지 추가 중`);
             
             const img = document.createElement('img');
             img.className = 'hymn-image';
@@ -378,13 +394,20 @@ function loadAdditionalPages(container, folder, number, pageNum, finalCallback) 
             img.loading = 'lazy';
             container.appendChild(img);
             
-            if (finalCallback) finalCallback(); // ⭐ 반드시 호출!
+            console.log(`✅ 이미지 DOM 추가 완료 - callback(true) 호출`);
+            if (finalCallback) finalCallback(true); // ⭐ 추가 페이지 있음!
         };
         
         testImg.onerror = function() {
             if (!hasSucceeded) {
                 completedCount++;
                 clearTimeout(timeoutId);
+                console.log(`❌ ${filename} 로드 실패 (${completedCount}/${filenames.length})`);
+                
+                if (completedCount === filenames.length) {
+                    console.log(`ℹ️ 모든 파일 실패 - callback(false) 호출`);
+                    if (finalCallback) finalCallback(false);
+                }
             }
         };
     });
