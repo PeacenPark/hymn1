@@ -154,16 +154,23 @@ function findExistingContainer(number) {
     for (const item of allItems) {
         const itemNumber = parseInt(item.dataset.hymnNumber);
         
-        // 단일 파일인 경우
+        // 정확히 일치하는 경우
         if (itemNumber === number) {
             return item;
         }
         
-        // 합본인 경우 (551-556처럼)
-        // 551-556.jpeg의 경우 data-hymn-number="551"로 저장됨
-        // 552를 검색하면 551 컨테이너를 찾아야 함
-        if (itemNumber < number && number <= itemNumber + 10) {
-            return item;
+        // 합본인 경우: alt 텍스트나 이미지 개수로 확인
+        // 예: "551-556번" 같은 alt 텍스트가 있는지 체크
+        const img = item.querySelector('.hymn-image');
+        if (img && img.alt) {
+            const altMatch = img.alt.match(/(\d+)-(\d+)번/);
+            if (altMatch) {
+                const start = parseInt(altMatch[1]);
+                const end = parseInt(altMatch[2]);
+                if (number >= start && number <= end) {
+                    return item;
+                }
+            }
         }
     }
     
