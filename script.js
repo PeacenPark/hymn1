@@ -79,6 +79,9 @@ function showWelcomeMessage() {
 
 // 찬송가 범위 로드 (검색 시)
 function loadHymnRange(startNumber) {
+    console.log(`🔍 ${startNumber}번 검색 시작`);
+    const startTime = performance.now();
+    
     loading.classList.add('active');
     hymnContainer.innerHTML = '';
     
@@ -101,10 +104,17 @@ function loadHymnRange(startNumber) {
     let loadedCount = 0;
     numbersToLoad.forEach((number, index) => {
         setTimeout(() => {
+            const imgStartTime = performance.now();
             loadHymnImage(number, folder, () => {
+                const imgEndTime = performance.now();
+                console.log(`✅ ${number}번 로드 완료: ${(imgEndTime - imgStartTime).toFixed(0)}ms`);
+                
                 loadedCount++;
                 if (loadedCount === numbersToLoad.length) {
                     loading.classList.remove('active');
+                    
+                    const endTime = performance.now();
+                    console.log(`🎉 전체 로딩 완료: ${(endTime - startTime).toFixed(0)}ms`);
                     
                     // 첫 번째 찬송가로 스크롤
                     const firstHymn = document.querySelector(`[data-hymn-number="${startNumber}"]`);
@@ -113,7 +123,7 @@ function loadHymnRange(startNumber) {
                     }
                 }
             });
-        }, index * 100); // 순차적 로딩
+        }, index * 50); // 50ms로 줄임
     });
 }
 
@@ -160,14 +170,22 @@ function loadHymnImage(number, folder, callback) {
     tryLoadWithPatterns(container, folder, number, patterns, 0, callback);
 }
 
-// 파일명 패턴 생성
+// 파일명 패턴 생성 - ⚡ 최적화: 단일 파일을 먼저!
 function generateFilePatterns(number, categoryName) {
     const patterns = [];
     const maxNumber = categories[currentCategory].total;
     
-    // 1. 합본 파일 (숫자만) - .jpeg 먼저
-    for (let start = Math.max(1, number - 5); start <= number; start++) {
-        for (let end = number; end <= Math.min(maxNumber, start + 5); end++) {
+    // ⭐ 1순위: 단일 파일 (가장 흔한 케이스) - .jpeg 먼저
+    patterns.push({ file: `${number}.jpeg`, type: 'single', range: [number] });
+    patterns.push({ file: `${number}.jpg`, type: 'single', range: [number] });
+    
+    // 2순위: 단일 파일 (카테고리명 포함)
+    patterns.push({ file: `${categoryName} ${number}.jpeg`, type: 'single', range: [number] });
+    patterns.push({ file: `${categoryName} ${number}.jpg`, type: 'single', range: [number] });
+    
+    // 3순위: 작은 범위 합본 (2-3개)
+    for (let start = Math.max(1, number - 2); start <= number; start++) {
+        for (let end = number; end <= Math.min(maxNumber, start + 2); end++) {
             if (start < end) {
                 patterns.push({ 
                     file: `${start}-${end}.jpeg`, 
@@ -183,9 +201,27 @@ function generateFilePatterns(number, categoryName) {
         }
     }
     
-    // 2. 합본 파일 (카테고리명)
-    for (let start = Math.max(1, number - 5); start <= number; start++) {
-        for (let end = number; end <= Math.min(maxNumber, start + 5); end++) {
+    // 4순위: 큰 범위 합본 (4-6개) - 드물지만 체크
+    for (let start = Math.max(1, number - 5); start <= Math.max(1, number - 3); start++) {
+        for (let end = Math.min(number + 3, maxNumber); end <= Math.min(maxNumber, start + 5); end++) {
+            if (start < end && end >= number) {
+                patterns.push({ 
+                    file: `${start}-${end}.jpeg`, 
+                    type: 'combined', 
+                    range: Array.from({length: end - start + 1}, (_, i) => start + i)
+                });
+                patterns.push({ 
+                    file: `${start}-${end}.jpg`, 
+                    type: 'combined', 
+                    range: Array.from({length: end - start + 1}, (_, i) => start + i)
+                });
+            }
+        }
+    }
+    
+    // 5순위: 카테고리명 포함 합본
+    for (let start = Math.max(1, number - 2); start <= number; start++) {
+        for (let end = number; end <= Math.min(maxNumber, start + 2); end++) {
             if (start < end) {
                 patterns.push({ 
                     file: `${categoryName} ${start}-${end}.jpeg`, 
@@ -201,14 +237,7 @@ function generateFilePatterns(number, categoryName) {
         }
     }
     
-    // 3. 단일 파일 (숫자만) - .jpeg 먼저
-    patterns.push({ file: `${number}.jpeg`, type: 'single', range: [number] });
-    patterns.push({ file: `${number}.jpg`, type: 'single', range: [number] });
-    
-    // 4. 단일 파일 (카테고리명)
-    patterns.push({ file: `${categoryName} ${number}.jpeg`, type: 'single', range: [number] });
-    patterns.push({ file: `${categoryName} ${number}.jpg`, type: 'single', range: [number] });
-    
+    console.log(`📋 ${number}번 패턴 개수: ${patterns.length}개`);
     return patterns;
 }
 
@@ -216,6 +245,7 @@ function generateFilePatterns(number, categoryName) {
 function tryLoadWithPatterns(container, folder, number, patterns, index, callback) {
     if (index >= patterns.length) {
         // 모든 패턴 실패 - placeholder
+        console.warn(`❌ ${number}번: ${patterns.length}개 패턴 모두 실패`);
         const placeholder = document.createElement('div');
         placeholder.className = 'hymn-placeholder';
         placeholder.innerHTML = `📷<br><br>${number}번<br>이미지 없음`;
@@ -229,9 +259,13 @@ function tryLoadWithPatterns(container, folder, number, patterns, index, callbac
     
     const pattern = patterns[index];
     const testImg = new Image();
+    const imgLoadStart = performance.now();
     testImg.src = `images/${folder}/${pattern.file}`;
     
     testImg.onload = function() {
+        const imgLoadEnd = performance.now();
+        console.log(`✅ ${number}번 [${index + 1}/${patterns.length}] 성공: ${pattern.file} (${(imgLoadEnd - imgLoadStart).toFixed(0)}ms)`);
+        
         // 합본 처리
         if (pattern.type === 'combined') {
             const alreadyLoaded = pattern.range.some(num => loadedImages.has(num) && num !== number);
@@ -272,6 +306,7 @@ function tryLoadWithPatterns(container, folder, number, patterns, index, callbac
     };
     
     testImg.onerror = function() {
+        // 실패는 로그 안 남김 (너무 많음)
         // 다음 패턴 시도
         tryLoadWithPatterns(container, folder, number, patterns, index + 1, callback);
     };
