@@ -133,9 +133,16 @@ function loadAllHymns() {
 
 // Intersection Observer 설정
 function setupIntersectionObserver() {
+    // ⭐ 먼저 처음 20개는 무조건 로드 (GitHub Pages 호환성)
+    for (let i = 1; i <= Math.min(20, Object.keys(allContainers).length); i++) {
+        if (!loadedImages.has(i)) {
+            loadHymnWithDelay(i);
+        }
+    }
+    
     const observerOptions = {
         root: null,
-        rootMargin: '500px', // 화면 위아래로 500px 미리 로드
+        rootMargin: '1000px', // 1000px로 증가 (더 일찍 로드)
         threshold: 0.01
     };
     
@@ -153,9 +160,12 @@ function setupIntersectionObserver() {
         });
     }, observerOptions);
     
-    // 모든 컨테이너 관찰
+    // 21번부터 관찰
     Object.values(allContainers).forEach(container => {
-        observer.observe(container);
+        const number = parseInt(container.dataset.hymnNumber);
+        if (number > 20) {
+            observer.observe(container);
+        }
     });
 }
 
@@ -170,8 +180,10 @@ function loadHymnWithDelay(number) {
     const folder = categories[currentCategory].folder;
     const container = allContainers[number];
     
-    // 동시 로드 수 제한 (한번에 최대 3개)
-    const delay = Math.floor(loadCounter / 3) * 100; // 3개당 100ms 딜레이
+    // 처음 20개는 빠르게, 나머지는 천천히
+    const delay = number <= 20 ? 
+        Math.floor(loadCounter / 5) * 50 : // 5개당 50ms
+        Math.floor(loadCounter / 3) * 100; // 3개당 100ms
     loadCounter++;
     
     setTimeout(() => {
