@@ -1,6 +1,9 @@
 // 전역 변수
 let currentCategory = 'chansongga';
-let loadedImages = new Set(); // 이미 로드된 번호 추적
+let loadedImages = new Set();
+let allContainers = {};
+let loadQueue = [];
+let isLoading = false;
 
 // DOM 요소
 const menuToggle = document.getElementById('menuToggle');
@@ -84,45 +87,96 @@ document.querySelectorAll('.page-link').forEach(link => {
 function loadAllHymns() {
     hymnContainer.innerHTML = '';
     loadedImages.clear();
+    allContainers = {};
+    loadQueue = [];
     loading.classList.add('active');
     
     const folder = categories[currentCategory].folder;
     const total = categories[currentCategory].total;
     
-    // ⭐ 미리 모든 컨테이너를 순서대로 생성
-    const containers = {};
+    // 1. 모든 컨테이너를 순서대로 생성
     for (let i = 1; i <= total; i++) {
         const hymnItem = document.createElement('div');
         hymnItem.className = 'hymn-item';
         hymnItem.dataset.hymnNumber = i;
-        hymnItem.style.minHeight = '100px'; // 로딩 중 최소 높이
-        containers[i] = hymnItem;
+        hymnItem.dataset.loaded = 'false';
+        hymnItem.style.minHeight = '400px';
+        
+        // 로딩 플레이스홀더
+        const placeholder = document.createElement('div');
+        placeholder.className = 'hymn-loading';
+        placeholder.innerHTML = `⏳<br><br>${i}번<br>로딩 대기중...`;
+        placeholder.style.cssText = `
+            width: 100%;
+            height: 400px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #f5f7fa 0%, #e3e8ef 100%);
+            color: #718096;
+            font-size: 20px;
+            font-weight: 600;
+        `;
+        hymnItem.appendChild(placeholder);
+        
+        allContainers[i] = hymnItem;
         hymnContainer.appendChild(hymnItem);
-    }
-    
-    // 이미지 비동기 로드
-    for (let i = 1; i <= total; i++) {
-        // 이미 로드된 번호는 건너뛰기
-        if (loadedImages.has(i)) {
-            continue;
-        }
-        loadHymnWithPages(i, folder, containers);
+        loadQueue.push(i);
     }
     
     loading.classList.remove('active');
+    
+    // 2. Intersection Observer로 뷰포트에 들어올 때만 로드
+    setupIntersectionObserver();
 }
 
-// 찬송가와 추가 페이지 로드
-function loadHymnWithPages(number, folder, containers) {
-    // 다시 한번 체크 (비동기 처리 중 추가될 수 있음)
+// Intersection Observer 설정
+function setupIntersectionObserver() {
+    const observerOptions = {
+        root: null,
+        rootMargin: '500px', // 화면 위아래로 500px 미리 로드
+        threshold: 0.01
+    };
+    
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const container = entry.target;
+                const number = parseInt(container.dataset.hymnNumber);
+                
+                if (container.dataset.loaded === 'false' && !loadedImages.has(number)) {
+                    loadHymnWithDelay(number);
+                    observer.unobserve(container);
+                }
+            }
+        });
+    }, observerOptions);
+    
+    // 모든 컨테이너 관찰
+    Object.values(allContainers).forEach(container => {
+        observer.observe(container);
+    });
+}
+
+// 딜레이를 둔 이미지 로드 (Rate Limit 방지)
+let loadCounter = 0;
+function loadHymnWithDelay(number) {
+    // 이미 로드된 경우 건너뛰기
     if (loadedImages.has(number)) {
         return;
     }
     
-    const hymnItem = containers[number];
+    const folder = categories[currentCategory].folder;
+    const container = allContainers[number];
     
-    // 첫 번째 이미지 로드 시도
-    tryLoadMainImage(hymnItem, folder, number, containers);
+    // 동시 로드 수 제한 (한번에 최대 3개)
+    const delay = Math.floor(loadCounter / 3) * 100; // 3개당 100ms 딜레이
+    loadCounter++;
+    
+    setTimeout(() => {
+        tryLoadMainImage(container, folder, number, allContainers);
+    }, delay);
 }
 
 // 메인 이미지 로드 시도 (합본 포함)
@@ -140,9 +194,7 @@ function generateFilePatterns(number, categoryName) {
     const patterns = [];
     const maxNumber = categories[currentCategory].total;
     
-    // ⭐ 중요: 합본 파일을 먼저 찾아야 중복 방지됨!
-    
-    // 1. 합본 파일 (숫자만) - 최대 6개 - 먼저 시도!
+    // 1. 합본 파일 (숫자만) - 최대 6개
     for (let start = Math.max(1, number - 5); start <= number; start++) {
         for (let end = number; end <= Math.min(maxNumber, start + 5); end++) {
             if (start < end) {
@@ -160,7 +212,7 @@ function generateFilePatterns(number, categoryName) {
         }
     }
     
-    // 2. 합본 파일 (카테고리명) - 최대 6개
+    // 2. 합본 파일 (카테고리명)
     for (let start = Math.max(1, number - 5); start <= number; start++) {
         for (let end = number; end <= Math.min(maxNumber, start + 5); end++) {
             if (start < end) {
@@ -178,7 +230,7 @@ function generateFilePatterns(number, categoryName) {
         }
     }
     
-    // 3. 단일 파일 (숫자만) - 합본을 찾지 못한 경우에만 시도
+    // 3. 단일 파일 (숫자만)
     patterns.push({ file: `${number}.jpg`, type: 'single', range: [number] });
     patterns.push({ file: `${number}.jpeg`, type: 'single', range: [number] });
     
@@ -199,6 +251,7 @@ function tryLoadWithPatterns(container, folder, number, patterns, index, contain
         container.innerHTML = '';
         container.appendChild(placeholder);
         container.style.minHeight = '';
+        container.dataset.loaded = 'true';
         loadedImages.add(number);
         return;
     }
@@ -208,27 +261,23 @@ function tryLoadWithPatterns(container, folder, number, patterns, index, contain
     testImg.src = `images/${folder}/${pattern.file}`;
     
     testImg.onload = function() {
-        // ⭐⭐⭐ 핵심 수정: 합본인 경우 범위의 모든 번호를 즉시 loadedImages에 추가
         if (pattern.type === 'combined') {
-            // 범위 내 모든 번호가 이미 처리되었는지 확인
             const alreadyLoaded = pattern.range.some(num => loadedImages.has(num) && num !== number);
             
             if (alreadyLoaded) {
-                // 이미 다른 번호에서 이 합본을 로드했음 - 이 컨테이너는 숨김
                 container.style.display = 'none';
+                container.dataset.loaded = 'true';
                 return;
             }
             
-            // 범위의 모든 번호를 즉시 추가 (다른 번호들이 이 합본을 다시 로드하지 않도록)
             pattern.range.forEach(num => {
                 loadedImages.add(num);
-                // 해당 범위의 다른 컨테이너들은 숨김
                 if (num !== number && containers[num]) {
                     containers[num].style.display = 'none';
+                    containers[num].dataset.loaded = 'true';
                 }
             });
             
-            // 첫 번째 번호로 표시 (가장 작은 번호)
             container.dataset.hymnNumber = pattern.range[0];
         } else {
             loadedImages.add(number);
@@ -245,20 +294,20 @@ function tryLoadWithPatterns(container, folder, number, patterns, index, contain
         container.innerHTML = '';
         container.appendChild(img);
         container.style.minHeight = '';
+        container.dataset.loaded = 'true';
         
-        // 단일 파일인 경우에만 추가 페이지 로드 (100-1.jpg 등)
+        // 단일 파일인 경우에만 추가 페이지 로드
         if (pattern.type === 'single') {
             loadAdditionalPages(container, folder, number, 1);
         }
     };
     
     testImg.onerror = function() {
-        // 다음 패턴 시도
         tryLoadWithPatterns(container, folder, number, patterns, index + 1, containers);
     };
 }
 
-// 추가 페이지 로드 (100-1.jpg, 100-2.jpg 등)
+// 추가 페이지 로드
 function loadAdditionalPages(container, folder, number, pageNum) {
     const categoryName = categories[currentCategory].name;
     
@@ -274,7 +323,6 @@ function loadAdditionalPages(container, folder, number, pageNum) {
 
 function tryLoadAdditionalPage(container, folder, number, pageNum, filenames, index) {
     if (index >= filenames.length) {
-        // 이 페이지 없음 - 종료
         return;
     }
     
@@ -283,7 +331,6 @@ function tryLoadAdditionalPage(container, folder, number, pageNum, filenames, in
     testImg.src = `images/${folder}/${filename}`;
     
     testImg.onload = function() {
-        // 추가 페이지 찾음!
         const img = document.createElement('img');
         img.className = 'hymn-image';
         img.src = this.src;
@@ -291,14 +338,12 @@ function tryLoadAdditionalPage(container, folder, number, pageNum, filenames, in
         img.loading = 'lazy';
         container.appendChild(img);
         
-        // 다음 페이지도 시도 (최대 5개 추가 페이지)
         if (pageNum < 5) {
             loadAdditionalPages(container, folder, number, pageNum + 1);
         }
     };
     
     testImg.onerror = function() {
-        // 다음 파일명 시도
         tryLoadAdditionalPage(container, folder, number, pageNum, filenames, index + 1);
     };
 }
@@ -316,63 +361,7 @@ function searchHymn() {
     const maxNumber = categories[currentCategory].total;
     
     if (!number || number < 1 || number > maxNumber) {
-        const overlayEl = document.createElement('div');
-        overlayEl.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 9999;
-        `;
-        
-        const alertMsg = document.createElement('div');
-        alertMsg.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 32px;
-            border-radius: 20px;
-            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
-            z-index: 10000;
-            text-align: center;
-            font-size: 24px;
-            font-weight: 700;
-            line-height: 1.6;
-            max-width: 90%;
-        `;
-        alertMsg.innerHTML = `
-            <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
-            <div style="color: #2d3748; margin-bottom: 12px;">번호를 확인해주세요</div>
-            <div style="color: #4a5568; font-size: 20px;">${categories[currentCategory].name}은(는)<br>1번부터 ${maxNumber}번까지 있습니다.</div>
-            <button style="
-                margin-top: 20px;
-                padding: 14px 32px;
-                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-                color: white;
-                border: none;
-                border-radius: 12px;
-                font-size: 22px;
-                font-weight: 700;
-                cursor: pointer;
-            ">확인</button>
-        `;
-        
-        overlayEl.onclick = () => {
-            overlayEl.remove();
-            alertMsg.remove();
-        };
-        
-        alertMsg.querySelector('button').onclick = () => {
-            overlayEl.remove();
-            alertMsg.remove();
-        };
-        
-        document.body.appendChild(overlayEl);
-        document.body.appendChild(alertMsg);
+        showAlert(`번호를 확인해주세요<br><br>${categories[currentCategory].name}은(는)<br>1번부터 ${maxNumber}번까지 있습니다.`);
         return;
     }
     
@@ -380,16 +369,53 @@ function searchHymn() {
     hymnNumberInput.value = '';
 }
 
+function showAlert(message) {
+    const overlayEl = document.createElement('div');
+    overlayEl.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+        background: rgba(0,0,0,0.5); z-index: 9999;
+    `;
+    
+    const alertMsg = document.createElement('div');
+    alertMsg.style.cssText = `
+        position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: white; padding: 32px; border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.3); z-index: 10000;
+        text-align: center; font-size: 24px; font-weight: 700;
+        line-height: 1.6; max-width: 90%;
+    `;
+    alertMsg.innerHTML = `
+        <div style="font-size: 48px; margin-bottom: 16px;">❌</div>
+        <div style="color: #2d3748;">${message}</div>
+        <button style="
+            margin-top: 20px; padding: 14px 32px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white; border: none; border-radius: 12px;
+            font-size: 22px; font-weight: 700; cursor: pointer;
+        ">확인</button>
+    `;
+    
+    overlayEl.onclick = () => {
+        overlayEl.remove();
+        alertMsg.remove();
+    };
+    
+    alertMsg.querySelector('button').onclick = () => {
+        overlayEl.remove();
+        alertMsg.remove();
+    };
+    
+    document.body.appendChild(overlayEl);
+    document.body.appendChild(alertMsg);
+}
+
 function scrollToHymn(number) {
-    // 해당 번호 또는 해당 번호를 포함하는 컨테이너 찾기
     let target = document.querySelector(`[data-hymn-number="${number}"]`);
     
-    // 합본에 포함되어 있을 수 있으므로, 범위 내에서 찾기
     if (!target) {
         const allItems = document.querySelectorAll('.hymn-item');
         for (const item of allItems) {
             const itemNumber = parseInt(item.dataset.hymnNumber);
-            // 합본인 경우 범위 내에 있는지 확인 (최대 6개 범위)
             if (itemNumber <= number && number <= itemNumber + 5) {
                 target = item;
                 break;
@@ -400,7 +426,6 @@ function scrollToHymn(number) {
     if (target) {
         target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         
-        // 강조 효과
         target.style.boxShadow = '0 0 0 4px #667eea';
         setTimeout(() => {
             target.style.boxShadow = '';
@@ -413,38 +438,25 @@ hymnNumberInput.max = categories[currentCategory].total;
 hymnNumberInput.placeholder = `번호 (1-${categories[currentCategory].total})`;
 loadAllHymns();
 
-// 맨 위로 버튼 기능
+// 맨 위로 버튼
 const scrollToTopBtn = document.createElement('button');
 scrollToTopBtn.id = 'scrollToTop';
 scrollToTopBtn.innerHTML = '⬆<br>맨위로';
 scrollToTopBtn.style.cssText = `
-    position: fixed;
-    bottom: 30px;
-    right: 30px;
-    width: 70px;
-    height: 70px;
+    position: fixed; bottom: 30px; right: 30px;
+    width: 70px; height: 70px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    font-size: 14px;
-    font-weight: 700;
-    cursor: pointer;
+    color: white; border: none; border-radius: 50%;
+    font-size: 14px; font-weight: 700; cursor: pointer;
     box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
-    z-index: 998;
-    opacity: 0;
-    visibility: hidden;
+    z-index: 998; opacity: 0; visibility: hidden;
     transition: opacity 0.3s, visibility 0.3s, transform 0.2s;
-    line-height: 1.3;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+    line-height: 1.3; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
 `;
 
 document.body.appendChild(scrollToTopBtn);
 
-// 스크롤 감지
 window.addEventListener('scroll', () => {
     if (window.scrollY > 300) {
         scrollToTopBtn.style.opacity = '1';
@@ -455,15 +467,10 @@ window.addEventListener('scroll', () => {
     }
 });
 
-// 맨 위로 이동
 scrollToTopBtn.addEventListener('click', () => {
-    window.scrollTo({
-        top: 0,
-        behavior: 'smooth'
-    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
-// 버튼 활성화 효과
 scrollToTopBtn.addEventListener('mousedown', () => {
     scrollToTopBtn.style.transform = 'scale(0.95)';
 });
