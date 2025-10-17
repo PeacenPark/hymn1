@@ -269,7 +269,7 @@ function tryLoadWithPatterns(container, folder, number, patterns, index, callbac
             cleanup();
             tryLoadWithPatterns(container, folder, number, patterns, index + 1, callback);
         }
-    }, 200);
+    }, 1000); // 200ms → 1000ms (1초)
     
     testImg.src = `images/${folder}/${pattern.file}`;
     
@@ -359,7 +359,7 @@ function tryLoadAdditionalPage(container, folder, number, pageNum, filenames, in
             cleanup();
             tryLoadAdditionalPage(container, folder, number, pageNum, filenames, index + 1, finalCallback);
         }
-    }, 200);
+    }, 800); // 200ms → 800ms
     
     testImg.src = `images/${folder}/${filename}`;
     
