@@ -60,7 +60,7 @@ function showWelcomeMessage() {
             </h2>
             <p style="font-size: 20px; opacity: 0.9; margin-bottom: 30px; line-height: 1.6;">
                 찾으시는 찬송가 번호를 입력하거나<br>
-                왼쪽 메뉴에서 선택해주세요
+                검색해주세요
             </p>
             <div style="
                 display: inline-block;
@@ -83,10 +83,30 @@ function loadHymnRange(startNumber) {
     const startTime = performance.now();
     
     loading.classList.add('active');
-    hymnContainer.innerHTML = '';
     
     const folder = categories[currentCategory].folder;
     const total = categories[currentCategory].total;
+    
+    // ⭐ 화면에 이미 있는지 확인
+    const existingContainer = findExistingContainer(startNumber);
+    if (existingContainer) {
+        console.log(`✅ ${startNumber}번은 화면에 이미 있음 - 스크롤 이동`);
+        loading.classList.remove('active');
+        
+        // 이미 있는 찬송가로 스크롤
+        existingContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        
+        // 강조 효과
+        existingContainer.style.boxShadow = '0 0 0 4px #667eea';
+        setTimeout(() => {
+            existingContainer.style.boxShadow = '';
+        }, 2000);
+        return;
+    }
+    
+    // 화면 초기화 (새로 로드)
+    hymnContainer.innerHTML = '';
+    loadedImages.clear(); // 화면 초기화하면 메모리도 초기화
     
     // 시작 번호와 다음 번호만 로드 (최대 2페이지)
     const numbersToLoad = [startNumber];
@@ -123,8 +143,31 @@ function loadHymnRange(startNumber) {
                     }
                 }
             });
-        }, index * 50); // 50ms로 줄임
+        }, index * 50);
     });
+}
+
+// 화면에 이미 있는 컨테이너 찾기
+function findExistingContainer(number) {
+    const allItems = document.querySelectorAll('.hymn-item');
+    
+    for (const item of allItems) {
+        const itemNumber = parseInt(item.dataset.hymnNumber);
+        
+        // 단일 파일인 경우
+        if (itemNumber === number) {
+            return item;
+        }
+        
+        // 합본인 경우 (551-556처럼)
+        // 551-556.jpeg의 경우 data-hymn-number="551"로 저장됨
+        // 552를 검색하면 551 컨테이너를 찾아야 함
+        if (itemNumber < number && number <= itemNumber + 10) {
+            return item;
+        }
+    }
+    
+    return null;
 }
 
 // 찬송가 컨테이너 생성
@@ -175,8 +218,8 @@ function generateFilePatterns(number, categoryName) {
     const patterns = [];
     const maxNumber = categories[currentCategory].total;
     
-    // ⭐ 특수 케이스: 551-556 (유일한 6개 합본)
-    if (number >= 551 && number <= 556) {
+    // ⭐ 특수 케이스: 551-556 (유일한 6개 합본) - 최우선!
+    if (number >= 551 && number <= 556 && currentCategory === 'chansongga') {
         patterns.push({ 
             file: '551-556.jpeg', 
             type: 'combined', 
@@ -225,7 +268,7 @@ function generateFilePatterns(number, categoryName) {
     return patterns;
 }
 
-// 패턴들로 이미지 로드 시도
+// 패턴들로 이미지 로드 시도 - ⚡ 빠른 실패
 function tryLoadWithPatterns(container, folder, number, patterns, index, callback) {
     if (index >= patterns.length) {
         // 모든 패턴 실패 - placeholder
@@ -244,9 +287,30 @@ function tryLoadWithPatterns(container, folder, number, patterns, index, callbac
     const pattern = patterns[index];
     const testImg = new Image();
     const imgLoadStart = performance.now();
+    
+    // ⚡ 타임아웃: 각 패턴당 200ms만 대기
+    let timeoutId;
+    let hasResponded = false;
+    
+    const cleanup = () => {
+        if (timeoutId) clearTimeout(timeoutId);
+        hasResponded = true;
+    };
+    
+    timeoutId = setTimeout(() => {
+        if (!hasResponded) {
+            cleanup();
+            // 다음 패턴 시도
+            tryLoadWithPatterns(container, folder, number, patterns, index + 1, callback);
+        }
+    }, 200);
+    
     testImg.src = `images/${folder}/${pattern.file}`;
     
     testImg.onload = function() {
+        if (hasResponded) return;
+        cleanup();
+        
         const imgLoadEnd = performance.now();
         console.log(`✅ ${number}번 [${index + 1}/${patterns.length}] 성공: ${pattern.file} (${(imgLoadEnd - imgLoadStart).toFixed(0)}ms)`);
         
@@ -290,15 +354,17 @@ function tryLoadWithPatterns(container, folder, number, patterns, index, callbac
     };
     
     testImg.onerror = function() {
-        // 실패는 로그 안 남김 (너무 많음)
+        if (hasResponded) return;
+        cleanup();
+        
         // 다음 패턴 시도
         tryLoadWithPatterns(container, folder, number, patterns, index + 1, callback);
     };
 }
 
-// 추가 페이지 로드 - ⚡ 실제 구조: 5.jpg, 5-1.jpg
+// 추가 페이지 로드 - ⚡ 실제 구조: 5.jpg, 5-1.jpg (최대 1개)
 function loadAdditionalPages(container, folder, number, pageNum, finalCallback) {
-    // 최대 1개 추가 페이지만 (5-1.jpg)
+    // 최대 1개 추가 페이지만
     if (pageNum > 1) {
         if (finalCallback) finalCallback();
         return;
@@ -322,7 +388,7 @@ function tryLoadAdditionalPage(container, folder, number, pageNum, filenames, in
     const filename = filenames[index];
     const testImg = new Image();
     
-    // ⚡ 타임아웃 설정: 300ms 내에 로드 안 되면 포기
+    // ⚡ 타임아웃 설정: 200ms 내에 로드 안 되면 포기
     let timeoutId;
     let hasResponded = false;
     
@@ -337,7 +403,7 @@ function tryLoadAdditionalPage(container, folder, number, pageNum, filenames, in
             // 다음 파일명 시도
             tryLoadAdditionalPage(container, folder, number, pageNum, filenames, index + 1, finalCallback);
         }
-    }, 200); // 300ms → 200ms로 단축
+    }, 200);
     
     testImg.src = `images/${folder}/${filename}`;
     
