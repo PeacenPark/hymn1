@@ -6,8 +6,6 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="mobile-web-app-capable" content="yes">
     <title>찬송가 뷰어</title>
-    <!-- GitHub Pages 호환: base 태그 (repository 이름이 있다면 수정하세요) -->
-    <!-- 예: <base href="/repository-name/"> -->
     <link rel="stylesheet" href="style.css">
     <style>
         /* 로딩 중 스타일 추가 */
@@ -21,47 +19,6 @@
     </style>
 </head>
 <body>
-    <!-- 햄버거 메뉴 버튼 -->
-    <button class="menu-toggle" id="menuToggle">
-        <span></span>
-        <span></span>
-        <span></span>
-    </button>
-
-    <!-- 사이드바 -->
-    <nav class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <h2>찬송가 목록</h2>
-        </div>
-        
-        <!-- 찬송가 섹션 -->
-        <div class="category">
-            <h3 class="category-title" data-category="chansongga">찬송가</h3>
-            <div class="page-links" id="chansongga-links">
-                <button class="page-link" data-start="1">1번으로 이동</button>
-                <button class="page-link" data-start="101">101번으로 이동</button>
-                <button class="page-link" data-start="201">201번으로 이동</button>
-                <button class="page-link" data-start="301">301번으로 이동</button>
-                <button class="page-link" data-start="401">401번으로 이동</button>
-                <button class="page-link" data-start="501">501번으로 이동</button>
-            </div>
-        </div>
-
-        <!-- 은혜찬송 섹션 -->
-        <div class="category">
-            <h3 class="category-title" data-category="eunhae">은혜찬송</h3>
-            <div class="page-links" id="eunhae-links">
-                <button class="page-link" data-start="1">1번으로 이동</button>
-                <button class="page-link" data-start="101">101번으로 이동</button>
-                <button class="page-link" data-start="201">201번으로 이동</button>
-                <button class="page-link" data-start="301">301번으로 이동</button>
-            </div>
-        </div>
-    </nav>
-
-    <!-- 오버레이 -->
-    <div class="overlay" id="overlay"></div>
-
     <!-- 메인 콘텐츠 -->
     <main class="main-content">
         <div class="content-header">
