@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>찬송가 뷰어</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- 햄버거 메뉴 버튼 -->
+    <button class="menu-toggle" id="menuToggle">
+        <span></span>
+        <span></span>
+        <span></span>
+    </button>
+
+    <!-- 사이드바 -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>찬송가 목록</h2>
+        </div>
+        
+        <!-- 찬송가 섹션 -->
+        <div class="category">
+            <h3 class="category-title" data-category="chansongga">찬송가</h3>
+            <div class="page-links" id="chansongga-links">
+                <button class="page-link" data-start="1">1번으로 이동</button>
+                <button class="page-link" data-start="101">101번으로 이동</button>
+                <button class="page-link" data-start="201">201번으로 이동</button>
+                <button class="page-link" data-start="301">301번으로 이동</button>
+                <button class="page-link" data-start="401">401번으로 이동</button>
+                <button class="page-link" data-start="501">501번으로 이동</button>
+            </div>
+        </div>
+
+        <!-- 은혜찬송 섹션 -->
+        <div class="category">
+            <h3 class="category-title" data-category="eunhae">은혜찬송</h3>
+            <div class="page-links" id="eunhae-links">
+                <button class="page-link" data-start="1">1번으로 이동</button>
+                <button class="page-link" data-start="101">101번으로 이동</button>
+                <button class="page-link" data-start="201">201번으로 이동</button>
+                <button class="page-link" data-start="301">301번으로 이동</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 오버레이 -->
+    <div class="overlay" id="overlay"></div>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="main-content">
+        <div class="content-header">
+            <h1 id="currentCategory">찬송가</h1>
+            <div class="search-box">
+                <select id="categorySelect" class="category-select">
+                    <option value="chansongga">찬송가</option>
+                    <option value="eunhae">은혜찬송</option>
+                </select>
+                <input type="number" id="hymnNumber" placeholder="번호 입력" min="1">
+                <button id="searchBtn">찾기</button>
+            </div>
+        </div>
+
+        <!-- 찬송가 이미지 컨테이너 -->
+        <div class="hymn-container" id="hymnContainer">
+            <!-- 이미지들이 동적으로 추가됩니다 -->
+        </div>
+
+        <!-- 로딩 인디케이터 -->
+        <div class="loading" id="loading">⏳ 불러오는 중...</div>
+    </main>
+
+    <script src="script.js"></script>
+</body>
+</html>
