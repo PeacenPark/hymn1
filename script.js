@@ -392,7 +392,12 @@ function loadAdditionalPages(container, folder, number, pageNum, finalCallback) 
             hasSucceeded = true;
             clearTimeout(timeoutId);
             
-            console.log(`✅ ${number}-${pageNum} 성공: ${filename} - 이미지 추가 중`);
+            console.log(`✅ ${number}-${pageNum} 성공: ${filename} - 새 컨테이너에 추가 중`);
+            
+            // ⭐ 새로운 컨테이너 생성 (데스크탑 가로 배치를 위해)
+            const additionalContainer = document.createElement('div');
+            additionalContainer.className = 'hymn-item';
+            additionalContainer.dataset.hymnNumber = `${number}-${pageNum}`;
             
             const img = document.createElement('img');
             img.className = 'hymn-image';
@@ -400,9 +405,13 @@ function loadAdditionalPages(container, folder, number, pageNum, finalCallback) 
             img.alt = `${number}번 (2페이지)`;
             img.loading = 'eager'; // 추가 페이지도 즉시 로드
             img.decoding = 'async'; // 비동기 디코딩
-            container.appendChild(img);
             
-            console.log(`✅ 이미지 DOM 추가 완료 - callback(true) 호출`);
+            additionalContainer.appendChild(img);
+            
+            // 현재 컨테이너 다음에 추가
+            container.parentNode.insertBefore(additionalContainer, container.nextSibling);
+            
+            console.log(`✅ 새 컨테이너에 이미지 DOM 추가 완료 - callback(true) 호출`);
             if (finalCallback) finalCallback(true); // ⭐ 추가 페이지 있음!
         };
         
