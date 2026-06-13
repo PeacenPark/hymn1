@@ -1,6 +1,7 @@
 // 전역 변수
 let currentCategory = 'chansongga';
 let loadedImages = new Set();
+let currentHymnNumber = null; // 현재 표시 중인 찬송가 번호
 
 // DOM 요소
 const hymnContainer = document.getElementById('hymnContainer');
@@ -40,6 +41,8 @@ function switchCategory(category) {
     // 카테고리 변경 시 초기화
     hymnContainer.innerHTML = '';
     loadedImages.clear();
+    currentHymnNumber = null; // ⭐ 번호 초기화
+    updateNavButtons(); // ⭐ 버튼 비활성화
     showWelcomeMessage();
 }
 
@@ -81,6 +84,9 @@ function showWelcomeMessage() {
 function loadHymnRange(startNumber) {
     console.log(`🔍 ${startNumber}번 검색 시작`);
     const startTime = performance.now();
+    
+    currentHymnNumber = startNumber; // ⭐ 현재 번호 저장
+    updateNavButtons(); // ⭐ 이전/다음 버튼 상태 업데이트
     
     loading.classList.add('active');
     
@@ -501,11 +507,11 @@ const scrollToTopBtn = document.createElement('button');
 scrollToTopBtn.id = 'scrollToTop';
 scrollToTopBtn.innerHTML = '⬆<br>맨위로';
 scrollToTopBtn.style.cssText = `
-    position: fixed; bottom: 30px; right: 30px;
-    width: 70px; height: 70px;
+    position: fixed; bottom: 110px; right: 20px;
+    width: 56px; height: 56px;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white; border: none; border-radius: 50%;
-    font-size: 14px; font-weight: 700; cursor: pointer;
+    font-size: 13px; font-weight: 700; cursor: pointer;
     box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
     z-index: 998; opacity: 0; visibility: hidden;
     transition: opacity 0.3s, visibility 0.3s, transform 0.2s;
@@ -543,4 +549,153 @@ scrollToTopBtn.addEventListener('touchstart', () => {
 
 scrollToTopBtn.addEventListener('touchend', () => {
     scrollToTopBtn.style.transform = 'scale(1)';
+});
+
+// ============================================================
+// ⬅️ 이전 / 다음 ➡️ 네비게이션 버튼
+// ============================================================
+
+// 버튼 컨테이너
+const navBtnContainer = document.createElement('div');
+navBtnContainer.id = 'navButtons';
+navBtnContainer.style.cssText = `
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 16px;
+    z-index: 998;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+`;
+
+// 이전 버튼
+const prevBtn = document.createElement('button');
+prevBtn.id = 'prevBtn';
+prevBtn.innerHTML = '◀ 이전';
+prevBtn.style.cssText = `
+    padding: 0 24px;
+    height: 56px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 28px;
+    font-size: 20px;
+    font-weight: 800;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+    transition: transform 0.15s, box-shadow 0.15s, opacity 0.2s;
+    white-space: nowrap;
+    min-width: 110px;
+`;
+
+// 번호 표시
+const navNumDisplay = document.createElement('div');
+navNumDisplay.id = 'navNumDisplay';
+navNumDisplay.style.cssText = `
+    height: 56px;
+    min-width: 80px;
+    padding: 0 18px;
+    background: white;
+    border-radius: 28px;
+    font-size: 22px;
+    font-weight: 900;
+    color: #667eea;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    letter-spacing: -0.5px;
+`;
+
+// 다음 버튼
+const nextBtn = document.createElement('button');
+nextBtn.id = 'nextBtn';
+nextBtn.innerHTML = '다음 ▶';
+nextBtn.style.cssText = prevBtn.style.cssText; // 동일 스타일
+
+navBtnContainer.appendChild(prevBtn);
+navBtnContainer.appendChild(navNumDisplay);
+navBtnContainer.appendChild(nextBtn);
+document.body.appendChild(navBtnContainer);
+
+// 버튼 상태 업데이트
+function updateNavButtons() {
+    if (currentHymnNumber === null) {
+        navBtnContainer.style.opacity = '0';
+        navBtnContainer.style.visibility = 'hidden';
+        return;
+    }
+
+    navBtnContainer.style.opacity = '1';
+    navBtnContainer.style.visibility = 'visible';
+
+    const total = categories[currentCategory].total;
+    navNumDisplay.textContent = `${currentHymnNumber}장`;
+
+    // 이전 버튼
+    if (currentHymnNumber <= 1) {
+        prevBtn.style.opacity = '0.35';
+        prevBtn.style.cursor = 'not-allowed';
+        prevBtn.disabled = true;
+    } else {
+        prevBtn.style.opacity = '1';
+        prevBtn.style.cursor = 'pointer';
+        prevBtn.disabled = false;
+    }
+
+    // 다음 버튼
+    if (currentHymnNumber >= total) {
+        nextBtn.style.opacity = '0.35';
+        nextBtn.style.cursor = 'not-allowed';
+        nextBtn.disabled = true;
+    } else {
+        nextBtn.style.opacity = '1';
+        nextBtn.style.cursor = 'pointer';
+        nextBtn.disabled = false;
+    }
+}
+
+// 이전 버튼 클릭
+prevBtn.addEventListener('click', () => {
+    if (currentHymnNumber > 1) {
+        loadHymnRange(currentHymnNumber - 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+});
+
+// 다음 버튼 클릭
+nextBtn.addEventListener('click', () => {
+    const total = categories[currentCategory].total;
+    if (currentHymnNumber < total) {
+        loadHymnRange(currentHymnNumber + 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+});
+
+// 버튼 눌림 효과
+[prevBtn, nextBtn].forEach(btn => {
+    btn.addEventListener('mousedown', () => { btn.style.transform = 'scale(0.95)'; });
+    btn.addEventListener('mouseup',   () => { btn.style.transform = 'scale(1)'; });
+    btn.addEventListener('touchstart',() => { btn.style.transform = 'scale(0.95)'; }, {passive: true});
+    btn.addEventListener('touchend',  () => { btn.style.transform = 'scale(1)'; });
+});
+
+// ⌨️ 키보드 단축키: ← → 방향키
+document.addEventListener('keydown', (e) => {
+    // 입력창에 포커스 중이면 무시
+    if (document.activeElement === hymnNumberInput) return;
+    
+    const total = categories[currentCategory].total;
+    if (e.key === 'ArrowLeft' && currentHymnNumber > 1) {
+        e.preventDefault();
+        loadHymnRange(currentHymnNumber - 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else if (e.key === 'ArrowRight' && currentHymnNumber < total) {
+        e.preventDefault();
+        loadHymnRange(currentHymnNumber + 1);
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
 });
